@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Edit Surat Keluar</title>
+  <base href="/web/">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="navbar"></div>
+
+  <main class="content">
+    <section class="form-container">
+      <h2>✏️ Edit Surat Keluar</h2>
+      <form id="editSuratForm" enctype="multipart/form-data">
+        <input type="hidden" name="id" />
+        <input type="text" name="nomor_surat" placeholder="Nomor Surat" required />
+        <input type="number" name="tahun" placeholder="Tahun" required />
+        <input type="text" name="perihal" placeholder="Perihal" required />
+        <input type="date" name="tanggal_surat" required />
+
+        <select name="klasifikasi" required>
+          <option value="">-- Pilih Klasifikasi Surat --</option>
+          <option value="biasa">Biasa</option>
+          <option value="segera">Segera</option>
+          <option value="penting">Penting</option>
+          <option value="rahasia">Rahasia</option>
+        </select>
+
+        <input type="text" name="pengirim" placeholder="Nama Pengirim" required readonly />
+        <input type="text" name="nama_dokumen" placeholder="Nama Dokumen" required />
+
+        <p id="fileLama">📎 File saat ini: <p id="fileName"></p></p>
+        <input type="file" name="file" />
+
+        <button type="submit">💾 Simpan Perubahan</button>
+      </form>
+      <p id="info"></p>
+    </section>
+  </main>
+
+  <script src="navbar.js"></script>
+<script>
+  const API_BASE = '/web';
+
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+
+  if (!id) {
+    alert('ID surat tidak ditemukan');
+    location.href = 'data-surat-keluar.html';
+  }
+
+  async function fetchData() {
+    try {
+      const res = await fetch(`${API_BASE}/get-surat/${encodeURIComponent(id)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json(); // { success, data: { surat } }
+      if (!payload?.success || !payload.data?.surat) {
+        throw new Error(payload?.message || 'Payload tidak sesuai');
+      }
+
+      const surat = payload.data.surat;
+      const form = document.forms['editSuratForm'];
+
+      form.nomor_surat.value = surat.nomor_surat ?? '';
+      form.tahun.value        = surat.tahun ?? '';
+      form.perihal.value      = surat.perihal ?? '';
+      form.tanggal_surat.value = surat.tanggal_surat
+        ? new Date(surat.tanggal_surat).toISOString().split('T')[0]
+        : '';
+      form.klasifikasi.value  = surat.klasifikasi ?? '';
+      form.pengirim.value     = surat.pengirim ?? '';
+      form.nama_dokumen.value = surat.nama_dokumen ?? '';
+      form.id.value           = surat.id;
+
+      const fileLabel = document.getElementById('fileName');
+      if (fileLabel) {
+        const fp = surat.file_path || '';
+        fileLabel.textContent = fp ? fp.split('/').pop() : '(belum ada file)';
+      }
+    } catch (err) {
+      console.error('Gagal memuat data:', err);
+      alert('Gagal memuat data surat');
+      location.href = 'data-surat-keluar.html';
+    }
+  }
+
+  document.getElementById('editSuratForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const info = document.getElementById('info');
+    if (info) {
+      info.style.color = '';
+      info.textContent = 'Menyimpan perubahan...';
+    }
+
+    try {
+      const formData = new FormData(this); // file boleh kosong; server handle
+      const res = await fetch(`${API_BASE}/edit-surat-keluar`, {
+        method: 'POST',
+        body: formData
+      });
+      const result = await res.json(); // { success, message? }
+      if (result?.success) {
+        if (info) {
+          info.style.color = 'green';
+          info.textContent = 'Surat berhasil diperbarui.';
+        }
+      } else {
+        if (info) {
+          info.style.color = 'red';
+          info.textContent = result?.message || 'Gagal memperbarui surat.';
+        }
+      }
+    } catch (err) {
+      console.error('Edit error:', err);
+      if (info) {
+        info.style.color = 'red';
+        info.textContent = 'Terjadi kesalahan saat menyimpan.';
+      }
+    }
+  });
+
+  // init
+  fetchData();
+</script>
+
+</body>
+</html>

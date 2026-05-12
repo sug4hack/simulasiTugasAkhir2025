@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>📤 Kirim Surat</title>
+  <base href="/web/">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+
+    #navbar {
+      background-color: #3f51b5;
+      padding: 12px 20px;
+      color: white;
+      font-weight: bold;
+    }
+
+    .content {
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 30px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 22px;
+      text-align: center;
+      color: #3f51b5;
+    }
+
+    form label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    select[multiple] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background-color: #fafafa;
+      height: 140px;
+      font-size: 15px;
+    }
+
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background-color: #3f51b5;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #303f9f;
+    }
+
+    #info {
+      margin-top: 20px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    #info.success {
+      color: green;
+    }
+
+    #info.error {
+      color: red;
+    }
+    .penerima-item { display:flex; gap:.5rem; align-items:center; }
+    .penerima-grid { display:block; }
+
+  </style>
+</head>
+<body>
+  <div id="navbar">📁 Sistem Surat</div>
+
+<div class="content">
+  <h2>📤 Naikkan Surat</h2>
+
+  <form id="formKirim">
+    <label><b>Pilih Penerima:</b></label>
+    <div id="penerima-container" class="penerima-grid" style="margin:.5rem 0 1rem;"></div>
+
+    <div style="margin-top: 1rem;">
+      <label for="catatan"><b>Catatan:</b></label><br>
+      <textarea id="catatan" rows="3" style="width: 100%;" placeholder="Tulis catatan atau instruksi tambahan..."></textarea>
+    </div>
+
+    <button type="submit">🚀 Kirim Surat</button>
+  </form>
+
+  <p id="info"></p>
+</div>
+
+  <script src="navbar.js"></script>
+  <script>
+  const API_BASE = '/web';
+  const urlParams = new URLSearchParams(window.location.search);
+  const suratId = urlParams.get('suratId');
+
+  const user = localStorage.getItem('user');
+  const penerimaContainer = document.getElementById('penerima-container');
+  const info = document.getElementById('info');
+
+  if (!user) location.href = 'index.html';
+  if (!suratId) {
+    alert('ID surat tidak ditemukan');
+    location.href = 'data-surat-keluar.html';
+  }
+
+  // Muat daftar penerima -> render sebagai checkbox
+  async function loadPenerima() {
+    try {
+      const res = await fetch(`${API_BASE}/penerima-surat?username=${encodeURIComponent(user)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json(); // { success, data: [...] }
+      if (!payload?.success || !Array.isArray(payload.data)) {
+        throw new Error(payload?.message || 'Payload tidak sesuai');
+      }
+
+      const rows = payload.data;
+      penerimaContainer.innerHTML = '';
+
+      if (!rows.length) {
+        penerimaContainer.innerHTML = '<p>Tidak ada penerima yang tersedia.</p>';
+        return;
+      }
+
+      rows.forEach((u, i) => {
+        const idCb = `penerima-${i}`;
+        const wrap = document.createElement('div');
+        wrap.className = 'penerima-item';
+        wrap.style.margin = '.25rem 0';
+        wrap.innerHTML = `
+          <input type="checkbox" id="${idCb}" name="penerima" value="${u.username}">
+          <label for="${idCb}">${u.username} ${u.jabatan ? `(${u.jabatan})` : ''}</label>
+        `;
+        penerimaContainer.appendChild(wrap);
+      });
+    } catch (err) {
+      console.error('loadPenerima error:', err);
+      penerimaContainer.innerHTML = '<p>❌ Gagal memuat data penerima.</p>';
+    }
+  }
+
+  // Submit form -> kumpulkan checkbox terpilih
+  document.getElementById('formKirim').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const selected = Array.from(document.querySelectorAll('input[name="penerima"]:checked'))
+      .map(el => el.value);
+
+    if (!selected.length) {
+      info.textContent = '❌ Pilih minimal satu penerima.';
+      info.classList.add('error');
+      return;
+    }
+
+    const catatan = document.getElementById('catatan').value.trim();
+    const body = { suratId, pengirim: user, penerima: selected, catatan };
+
+    try {
+      const res = await fetch(`${API_BASE}/kirim-surat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const payload = await res.json(); // { success, message? }
+
+      if (payload?.success) {
+        info.textContent = '✅ Surat berhasil dikirim.';
+        info.classList.remove('error');
+        document.getElementById('formKirim').reset();
+      } else {
+        info.textContent = payload?.message || '❌ Gagal mengirim surat.';
+        info.classList.add('error');
+      }
+    } catch (err) {
+      console.error('kirim-surat error:', err);
+      info.textContent = '❌ Terjadi kesalahan saat mengirim.';
+      info.classList.add('error');
+    }
+  });
+
+  // init
+  loadPenerima();
+</script>
+
+</body>
+</html>

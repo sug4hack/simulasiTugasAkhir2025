@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>📤 Kirim Surat ke OPD</title>
+  <base href="/web/">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9f9;
+      color: #333;
+      margin: 0;
+    }
+
+    #navbar {
+      background-color: #3f51b5;
+      padding: 12px 20px;
+      color: white;
+      font-weight: bold;
+    }
+
+    .content {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 30px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 22px;
+      text-align: center;
+      color: #3f51b5;
+    }
+
+    .opd-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .opd-item {
+      flex: 1 1 calc(33.333% - 10px);
+      background-color: #f1f1f1;
+      padding: 10px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+    }
+
+    .opd-item input {
+      margin-right: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 20px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background-color: #3f51b5;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #303f9f;
+    }
+
+    #info {
+      margin-top: 20px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    #info.success { color: green; }
+    #info.error { color: red; }
+  </style>
+</head>
+<body>
+  <div id="navbar">📁 Sistem Surat</div>
+
+  <div class="content">
+    <h2>📤 Kirim Surat ke OPD</h2>
+
+    <form id="formKirim">
+      <label><b>Pilih OPD Tujuan:</b></label>
+      <div id="daftarOpd" class="opd-list"></div>
+
+      <label for="catatan"><b>Catatan (opsional):</b></label>
+      <textarea id="catatan" rows="3" placeholder="Tulis catatan atau instruksi tambahan..."></textarea>
+
+      <button type="submit">🚀 Kirim Surat</button>
+    </form>
+
+    <p id="info"></p>
+  </div>
+
+  <script src="navbar.js"></script>
+<script>
+  const API_BASE = '/web';
+
+  const suratId = new URLSearchParams(window.location.search).get('suratId');
+  const user = localStorage.getItem('user');
+  const opdContainer = document.getElementById('daftarOpd');
+  const info = document.getElementById('info');
+
+  if (!user) location.href = 'index.html';
+  if (!suratId) {
+    alert('ID surat tidak ditemukan');
+    location.href = 'data-surat-keluar.html';
+  }
+
+  let opdTujuan = []; // { opd, petugas_tu, nama_opd }
+
+  async function loadOPDList() {
+    try {
+      const res = await fetch(`${API_BASE}/daftar-opd-tujuan?username=${encodeURIComponent(user)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json(); // { success, data: [...] }
+      if (!payload?.success || !Array.isArray(payload.data)) {
+        throw new Error(payload?.message || 'Payload tidak sesuai');
+      }
+
+      opdTujuan = payload.data;
+
+      opdContainer.innerHTML = '';
+      opdTujuan.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'opd-item';
+        div.innerHTML = `
+          <input type="checkbox" id="opd-${idx}" value="${item.opd}">
+          <label for="opd-${idx}">${item.nama_opd || ('OPD ' + item.opd)}</label>
+        `;
+        opdContainer.appendChild(div);
+      });
+    } catch (err) {
+      console.error('loadOPDList error:', err);
+      opdContainer.innerHTML = '<p>❌ Gagal memuat OPD.</p>';
+    }
+  }
+
+  document.getElementById('formKirim').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const selected = Array.from(document.querySelectorAll('input[type=checkbox]:checked'))
+      .map(cb => cb.value);
+
+    if (selected.length === 0) {
+      info.textContent = '❌ Pilih minimal satu OPD.';
+      info.className = 'error';
+      return;
+    }
+
+    const catatan = document.getElementById('catatan').value.trim();
+
+    // Ambil username petugas TU dari OPD yang dipilih
+    const penerima = opdTujuan
+      .filter(opd => selected.includes(opd.opd))
+      .map(opd => opd.petugas_tu)
+      .filter(Boolean);
+
+    if (!penerima.length) {
+      info.textContent = '❌ Tidak ada petugas TU valid pada OPD terpilih.';
+      info.className = 'error';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/kirim-surat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suratId, pengirim: user, penerima, catatan })
+      });
+      const result = await res.json(); // { success, message? }
+
+      if (result?.success) {
+        info.textContent = '✅ Surat berhasil dikirim.';
+        info.className = 'success';
+        document.getElementById('formKirim').reset();
+      } else {
+        info.textContent = result?.message || '❌ Gagal mengirim surat.';
+        info.className = 'error';
+      }
+    } catch (err) {
+      console.error('kirim-surat error:', err);
+      info.textContent = '❌ Terjadi kesalahan saat mengirim.';
+      info.className = 'error';
+    }
+  });
+
+  // init
+  loadOPDList();
+</script>
+
+</body>
+</html>

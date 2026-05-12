@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Data Surat Keluar</title>
+  <base href="/web/">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .table-container {
+      background: #ffffff; padding: 2rem; margin: 2rem auto;
+      border-radius: 12px; box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+      max-width: 100%; overflow-x: auto;
+    }
+
+    table {
+      width: 100%; border-collapse: collapse; font-size: 0.95rem;
+    }
+
+    th, td {
+      padding: 12px 16px; border: 1px solid #ddd; text-align: left;
+    }
+
+    th { background-color: #007bff; color: white; }
+
+    button {
+      padding: 6px 12px; margin: 2px; border: none;
+      border-radius: 4px; font-size: 0.9rem; cursor: pointer;
+    }
+
+    .hapus-btn { background-color: #dc3545; color: white; }
+    .kirim-btn { background-color: #007bff; color: white; }
+
+    .badge {
+      padding: 4px 8px; border-radius: 6px; font-size: 0.85rem;
+      color: white; display: inline-block;
+    }
+
+    .badge.entri { background-color: #ffc107; }
+    .badge.proses { background-color: #17a2b8; }
+    .badge.selesai { background-color: #28a745; }
+
+    .modal {
+      display: none; position: fixed; z-index: 999;
+      left: 0; top: 0; width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.7);
+    }
+
+    .modal-content {
+      background-color: #fff; margin: 5% auto; padding: 10px;
+      border-radius: 8px; width: 80%;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+
+    .close {
+      float: right; font-size: 24px; font-weight: bold; cursor: pointer;
+    }
+
+    iframe {
+      width: 100%; height: 600px; border: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="navbar"></div>
+
+  <div class="table-container">
+    <h2>📑 Data Surat Keluar</h2>
+    <table id="dataSurat">
+      <thead>
+        <tr>
+          <th>No</th>
+          <th>Nomor Surat</th>
+          <th>Perihal</th>
+          <th>Tanggal</th>
+          <th>Klasifikasi</th>
+          <th>Nama Dokumen</th>
+          <th>File</th>
+          <th>Penerima</th>
+          <th>Penandatangan</th>
+          <th>Catatan</th>
+          <th>Status</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="pdfModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <iframe id="pdfFrame"></iframe>
+    </div>
+  </div>
+
+  <script src="navbar.js"></script>
+  <script>
+  const API_BASE = '/web';
+
+  const user = localStorage.getItem('user');
+  if (!user) location.href = 'index.html';
+
+  function logout() {
+    localStorage.removeItem('user');
+    window.location.href = 'index.html';
+  }
+
+  function mapStatus(serverStatus) {
+    switch (serverStatus) {
+      case 'Belum Dikirim': return 'entri';
+      case 'Terkirim Sebagian': return 'proses';
+      case 'Selesai Diterima Semua': return 'selesai';
+      default: return 'entri';
+    }
+  }
+
+  async function loadSuratKeluar() {
+    try {
+      const res = await fetch(`${API_BASE}/data-surat-keluar?pengirim=${encodeURIComponent(user)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json(); // { success, data: rows }
+
+      if (!payload?.success || !Array.isArray(payload.data)) {
+        throw new Error('Payload tidak sesuai');
+      }
+
+      const rows = payload.data;
+      const tbody = document.querySelector('#dataSurat tbody');
+      tbody.innerHTML = '';
+
+      rows.forEach((item, index) => {
+        const status = (item.status_surat || 'entri').toString();
+        const badgeClass = status;
+
+        let aksiHTML = `
+          <button class="hapus-btn" onclick="hapusSurat(${item.id}, '${(item.file_path || '').replace(/'/g, "\\'")}')">🗑</button>
+          <button onclick="editSurat(${item.id})">✏️ Edit</button>
+        `;
+
+        if (status === 'selesai' || status.toLowerCase().includes('selesai')) {
+          aksiHTML += `<button class="kirim-btn" onclick="kirimSuratKeluar(${item.id})">📤 Kirim Surat</button>`;
+        } else {
+          aksiHTML += `<button class="kirim-btn" onclick="kirimSurat(${item.id})">📤 Naikkan Surat</button>`;
+        }
+
+        const tgl = item.tanggal_surat
+          ? new Date(item.tanggal_surat).toLocaleString('id-ID', {
+              timeZone: 'Asia/Jakarta', year: 'numeric', month: 'long', day: 'numeric'
+            })
+          : '-';
+
+        const daftarPenerimaHTML =
+          item.daftar_penerima ? item.daftar_penerima.split(', ').join('<br>') : '-';
+
+        const catatanAliceHTML = item.catatan_ke_alice
+          ? item.catatan_ke_alice.split(', ').map(c => {
+              const [pengirim, isi] = c.split(':');
+              if (!pengirim || !isi) return c.trim();
+              return `${pengirim.trim()}: ${isi.trim()}`;
+            }).join('<br>')
+          : '-';
+
+        tbody.innerHTML += `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${item.nomor_surat || '-'}</td>
+            <td>${item.perihal || '-'}</td>
+            <td>${tgl}</td>
+            <td>${item.klasifikasi || '-'}</td>
+            <td>${item.nama_dokumen || '-'}</td>
+            <td><button onclick="openPdfViewer('${API_BASE}/decrypt/${item.id}')">📎 Lihat</button></td>
+            <td>${daftarPenerimaHTML}</td>
+            <td>${item.penandatangan || '-'}</td>
+            <td>${catatanAliceHTML}</td>
+            <td><span class="badge ${badgeClass}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></td>
+            <td>${aksiHTML}</td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      console.error('Gagal memuat data surat keluar:', err);
+      alert('Gagal memuat data surat keluar.');
+    }
+  }
+
+  async function hapusSurat(id, filePath) {
+    if (!confirm('Yakin ingin menghapus surat ini?')) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/hapus-surat/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath })
+      });
+      const payload = await res.json(); // { success, message? }
+      if (payload?.success) {
+        alert('Surat berhasil dihapus.');
+        loadSuratKeluar();
+      } else {
+        alert(payload?.message || 'Gagal menghapus surat.');
+      }
+    } catch (e) {
+      console.error('hapusSurat error:', e);
+      alert('Gagal menghapus surat.');
+    }
+  }
+
+  function kirimSurat(id) {
+    window.location.href = `kirim-surat.html?suratId=${id}`;
+  }
+
+  function kirimSuratKeluar(id) {
+    window.location.href = `kirim-surat-keluar.html?suratId=${id}`;
+  }
+
+  function editSurat(id) {
+    window.location.href = `edit-surat.html?id=${id}`;
+  }
+
+  function openPdfViewer(url) {
+    document.getElementById('pdfFrame').src = url;
+    document.getElementById('pdfModal').style.display = 'block';
+  }
+
+  function closeModal() {
+    document.getElementById('pdfModal').style.display = 'none';
+    document.getElementById('pdfFrame').src = '';
+  }
+
+  // init
+  loadSuratKeluar();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard</title>
+  <base href="/web/">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="navbar"></div>
+  <main class="dashboard">
+    <section class="welcome-card">
+      <h1>Selamat Datang 👋</h1>
+      <div class="info-user">
+        <p><strong>Nama:</strong> <span id="namaUser">-</span></p>
+        <p><strong>Jabatan:</strong> <span id="jabatanUser">-</span></p>
+        <p><strong>OPD:</strong> <span id="opdUser">-</span></p>
+      </div>
+    </section>
+
+  </main>
+  <script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    const user = localStorage.getItem('user');
+    if (!user) return;
+
+    try {
+      const res = await fetch(`/web/user-info?username=${encodeURIComponent(user)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json(); // { success: true, data: { jabatan, opd } }
+
+      const info = payload && payload.data ? payload.data : null;
+
+      document.getElementById('namaUser').textContent = capitalizeWords(user);
+      document.getElementById('jabatanUser').textContent = info?.jabatan ?? '-';
+      document.getElementById('opdUser').textContent = info?.opd ?? '-';
+    } catch (err) {
+      console.error('Gagal memuat data user:', err);
+      document.getElementById('jabatanUser').textContent = '-';
+      document.getElementById('opdUser').textContent = '-';
+    }
+  });
+
+  function capitalizeWords(str) {
+    return str.replace(/\b\w/g, c => c.toUpperCase());
+  }
+</script>
+
+
+  <script src="navbar.js"></script>
+</body>
+</html>

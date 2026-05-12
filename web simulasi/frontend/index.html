@@ -1,0 +1,333 @@
+<!-- <!DOCTYPE html>
+<html lang="id">
+<head>
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login</title>
+  <base href="/web/">
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background-color: #f4f6f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .login-container {
+      background-color: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #007bff;
+      margin-bottom: 1.5rem;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    input {
+      padding: 10px;
+      margin-bottom: 1rem;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #message {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.95rem;
+    }
+
+    .register-link {
+      margin-top: 1rem;
+      text-align: center;
+    }
+
+    .register-link a {
+      color: #007bff;
+      text-decoration: none;
+    }
+
+    .register-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h2>🔐 Masuk ke Sistem</h2>
+    <form id="loginForm">
+      <input type="text" id="username" placeholder="Nama Pengguna" required />
+      <input type="password" id="password" placeholder="Kata Sandi" required />
+      <button type="submit">Masuk</button>
+    </form>
+    <p id="message"></p>
+    <div class="register-link">
+      Belum punya akun? <a href="register.html">Daftar di sini</a>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+
+      const response = await fetch("/web/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+      const msg = document.getElementById("message");
+
+      if (data.success) {
+        localStorage.setItem("user", data.user);
+        window.location.href = "dashboard.html";
+      } else {
+        msg.style.color = "red";
+        msg.innerText = "Login gagal! Periksa username atau password.";
+      }
+    });
+  </script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login - ASNDIGITAL</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      background-color: #f0f4f8;
+    }
+
+    .left-panel {
+      flex: 1;
+      background-color: #e8f0ff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+    }
+
+    .left-panel h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      font-weight: bold;
+      color: #555;
+      font-family: 'Courier New', monospace;
+    }
+
+    .left-panel img {
+      max-width: 300px;
+      margin-bottom: 1.5rem;
+    }
+
+    .left-panel .description {
+      text-align: center;
+      max-width: 500px;
+      font-size: 1rem;
+      color: #333;
+    }
+
+    .right-panel {
+      flex: 1;
+      background-color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+      box-shadow: -5px 0 15px rgba(0,0,0,0.05);
+    }
+
+    .right-panel img.logo {
+      height: 80px;
+      margin-bottom: 1rem;
+    }
+
+    .right-panel h2 {
+      margin-bottom: 2rem;
+      font-size: 1.4rem;
+      color: #222;
+    }
+
+    form {
+      width: 100%;
+      max-width: 300px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    input {
+      padding: 10px;
+      margin-bottom: 1rem;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 10px;
+      background-color: #20a9e0;
+      color: white;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #1a8fbe;
+    }
+
+    .footer-logo {
+      margin-top: 1rem;
+    }
+
+    .footer-logo img {
+      height: 40px;
+    }
+
+    #message {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.95rem;
+    }
+
+    .copyright {
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      color: #888;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        flex-direction: column;
+      }
+
+      .left-panel, .right-panel {
+        flex: none;
+        width: 100%;
+        height: auto;
+        box-shadow: none;
+      }
+
+      .left-panel {
+        padding: 2rem 1rem;
+      }
+
+      .right-panel {
+        padding: 2rem 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="left-panel">
+    <h1>ASNDIGITAL DUMMY 2</h1>
+    <img src="assets/img/bg-office.png" alt="illustration" />
+    <div class="description">
+      <h3>Tentang Aplikasi</h3>
+      <p>
+        ASNDIGITAL DUMMY 2 merupakan bagian dari Simulasi Tugas Akhir Layanan Persuratan Terenkripsi yang didukung fitur Prototipe Tanda Tangan Digital.
+      </p>
+      <p class="copyright">©2025 | Pemerintah Kota Kediri dan Politeknik Siber dan Sandi Negara</p>
+    </div>
+  </div>
+
+  <div class="right-panel">
+  <div class="logo-container">
+    <img class="logo" src="assets/img/logo.png" alt="Logo Pemkot Kediri" />
+    <img class="logo" src="assets/img/logo2.png" alt="Logo Poltek" />
+  </div>
+  <h2>Pemerintah Kota Kediri dan Poltek SSN</h2>
+  <form id="loginForm">
+    <input type="text" id="username" placeholder="Username" required />
+    <input type="password" id="password" placeholder="Password" required />
+    <button type="submit">Login</button>
+    <p id="message"></p>
+  </form>
+</div>
+
+
+ <script>
+document.getElementById("loginForm").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  const msg = document.getElementById("message");
+  msg.textContent = "";
+
+  try {
+    const response = await fetch("/web/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    // Hanya lolos jika HTTP OK & success & ada user bernilai truthy
+    if (response.ok && data?.success && data?.user) {
+      localStorage.setItem("user", data.user); // pertimbangkan pakai httpOnly cookie untuk produksi
+      window.location.href = "dashboard.html";
+    } else {
+      msg.style.color = "red";
+      msg.innerText = data?.message || "Login gagal! Periksa username atau password.";
+    }
+  } catch (err) {
+    console.error(err);
+    msg.style.color = "red";
+    msg.innerText = "Terjadi kesalahan jaringan.";
+  }
+});
+</script>
+
+</body>
+</html>

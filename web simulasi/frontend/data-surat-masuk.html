@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Data Surat Masuk</title>
+  <base href="/web/">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .table-container {
+      background: #ffffff; padding: 2rem; margin: 2rem auto;
+      border-radius: 12px; box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+      max-width: 100%; overflow-x: auto;
+    }
+
+    table {
+      width: 100%; border-collapse: collapse; font-size: 0.95rem;
+    }
+
+    th, td {
+      padding: 12px 16px; border: 1px solid #ddd; text-align: left;
+    }
+
+    th { background-color: #007bff; color: white; }
+
+    button {
+      padding: 6px 12px; margin: 2px; border: none;
+      border-radius: 4px; font-size: 0.9rem; cursor: pointer;
+    }
+
+    .hapus-btn { background-color: #dc3545; color: white; }
+    .kirim-btn { background-color: #007bff; color: white; }
+
+    .badge {
+      padding: 4px 8px; border-radius: 6px; font-size: 0.85rem;
+      color: white; display: inline-block;
+    }
+
+    .badge.entri { background-color: #ffc107; }
+    .badge.diterima { background-color: #ffac3f; }
+    .badge.proses { background-color: #17a2b8; }
+    .badge.selesai { background-color: #28a745; }
+
+    .modal {
+      display: none; position: fixed; z-index: 999;
+      left: 0; top: 0; width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.7);
+    }
+
+    .modal-content {
+      background-color: #fff; margin: 5% auto; padding: 10px;
+      border-radius: 8px; width: 80%;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+
+    .close {
+      float: right; font-size: 24px; font-weight: bold; cursor: pointer;
+    }
+
+    iframe {
+      width: 100%; height: 600px; border: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="table-container">
+    <h2>📩 Data Surat Masuk</h2>
+
+      <table id="suratMasukTable">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Nomor Surat</th>
+            <th>Perihal</th>
+            <th>Tanggal</th>
+            <th>Pengirim</th>
+            <th>Nama Dokumen</th>
+            <th>Penandatangan</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="tbodySurat"></tbody>
+      </table>
+    </div>
+  </div>
+
+    <!-- Modal Input Passphrase -->
+  <div id="passphraseModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closePassphraseModal()">&times;</span>
+      <h3>Masukkan Passphrase untuk Tanda Tangan</h3>
+      <input type="password" id="passphraseInput" placeholder="Passphrase" style="width: 100%; padding: 10px; margin-top: 10px; font-size: 1rem;" />
+      <button style="margin-top: 12px;" onclick="submitPassphrase()">Lanjutkan</button>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = '/web';
+
+  const user = localStorage.getItem('user');
+  if (!user) location.href = 'index.html';
+
+  let userJabatan = '';
+  let currentSuratId = null;
+
+  function logout() {
+    localStorage.removeItem('user');
+    window.location.href = 'index.html';
+  }
+
+  async function getUserInfo() {
+    try {
+      const res = await fetch(`${API_BASE}/user-info?username=${encodeURIComponent(user)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json(); // { success, data: { jabatan, opd } }
+      if (!payload?.success) throw new Error(payload?.message || 'Gagal memuat user-info');
+      const info = payload.data || {};
+      userJabatan = info.jabatan || '';
+    } catch (err) {
+      console.error('getUserInfo error:', err);
+      userJabatan = '';
+    }
+  }
+
+  async function loadSuratMasuk() {
+    try {
+      const res = await fetch(`${API_BASE}/surat-masuk?user=${encodeURIComponent(user)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json(); // { success, data: rows }
+      if (!payload?.success || !Array.isArray(payload.data)) throw new Error('Payload tidak sesuai');
+
+      const rows = payload.data;
+      const tbody = document.getElementById('tbodySurat');
+      tbody.innerHTML = '';
+
+      rows.forEach((item, index) => {
+        const status = (item.status_pengiriman || '').toString().toLowerCase();
+        const isDiterima = status === 'diterima';
+        const isProses   = status === 'proses';
+        const isSelesai  = status === 'selesai';
+        const tombolLabel = userJabatan === 'Kepala' ? 'Disposisi Surat' : 'Naikkan Surat';
+        const isPenandatangan = (item.penandatangan || '') === user;
+
+        let statusBadge = `<span class="badge belum">${item.status_pengiriman || 'belum'}</span>`;
+        let tombol = `<button onclick="terimaSurat(${item.pengiriman_id})">Terima</button>`;
+
+        if (isDiterima) {
+          statusBadge = `<span class="badge diterima">${item.status_pengiriman}</span>`;
+          tombol = `
+            <button onclick="kirimSurat(${item.pengiriman_id})">${tombolLabel}</button>
+            <button onclick="window.location.href='detail-surat.html?id=${item.id}'">Detail Surat</button>
+          `;
+        } else if (isProses) {
+          statusBadge = `<span class="badge proses">proses</span>`;
+          tombol = `
+            ${userJabatan === 'Kepala' ? `<button onclick="konfirmasiSelesai(${item.pengiriman_id})">Konfirmasi Selesai</button>` : ''}
+            <button onclick="kirimSurat(${item.pengiriman_id})">${tombolLabel}</button>
+            <button onclick="window.location.href='detail-surat.html?id=${item.id}'">Detail Surat</button>
+          `;
+        } else if (isSelesai) {
+          statusBadge = `<span class="badge selesai">selesai</span>`;
+          tombol = `
+            <span class="badge selesai">✔ Selesai</span>
+            <button onclick="window.location.href='detail-surat.html?id=${item.id}'">Detail Surat</button>
+          `;
+        }
+
+        if (isPenandatangan) {
+          tombol += ` <button class="btn-tandatangan">Tandatangani</button>`;
+        }
+
+        const tgl = item.tanggal_surat
+          ? new Date(item.tanggal_surat).toLocaleString('id-ID', {
+              timeZone: 'Asia/Jakarta', year: 'numeric', month: 'long', day: 'numeric'
+            })
+          : '-';
+
+        const row = `
+          <tr data-surat-id="${item.id}">
+            <td>${index + 1}</td>
+            <td>${item.nomor_surat || '-'}</td>
+            <td>${item.perihal || '-'}</td>
+            <td>${tgl}</td>
+            <td>${item.pengirim || '-'}</td>
+            <td>${item.nama_dokumen || '-'}</td>
+            <td>${item.penandatangan || '-'}</td>
+            <td>${statusBadge}</td>
+            <td>${tombol}</td>
+          </tr>
+        `;
+        tbody.insertAdjacentHTML('beforeend', row);
+      });
+    } catch (err) {
+      console.error('loadSuratMasuk error:', err);
+      alert('Gagal memuat surat masuk.');
+    }
+  }
+
+  async function terimaSurat(pengirimanId) {
+    try {
+      const res = await fetch(`${API_BASE}/terima-surat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pengirimanId, status: 'proses' })
+      });
+      const payload = await res.json(); // { success, message? }
+      if (payload?.success) location.reload();
+      else alert(payload?.message || 'Gagal menerima surat.');
+    } catch (e) {
+      console.error('terimaSurat error:', e);
+      alert('Gagal menerima surat.');
+    }
+  }
+
+  async function konfirmasiSelesai(pengirimanId) {
+    try {
+      const res = await fetch(`${API_BASE}/terima-surat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pengirimanId, status: 'selesai' })
+      });
+      const payload = await res.json();
+      if (payload?.success) location.reload();
+      else alert(payload?.message || 'Gagal konfirmasi selesai.');
+    } catch (e) {
+      console.error('konfirmasiSelesai error:', e);
+      alert('Gagal konfirmasi selesai.');
+    }
+  }
+
+  function kirimSurat(pengirimanId) {
+    // cari baris berdasarkan tombol yang ditekan
+    const btn = document.querySelector(`button[onclick="kirimSurat(${pengirimanId})"]`);
+    if (!btn) return;
+    const row = btn.closest('tr');
+    const suratId = row?.getAttribute('data-surat-id');
+    if (!suratId) return alert('ID surat tidak ditemukan.');
+    window.location.href = `kirim-surat.html?suratId=${encodeURIComponent(suratId)}`;
+  }
+
+  function closePassphraseModal() {
+    document.getElementById('passphraseModal').style.display = 'none';
+  }
+
+  async function submitPassphrase() {
+    const passphrase = document.getElementById('passphraseInput').value.trim();
+    if (!passphrase) return alert('Passphrase tidak boleh kosong.');
+    if (!currentSuratId) return alert('ID surat tidak ditemukan.');
+
+    closePassphraseModal();
+
+    try {
+      const res = await fetch(`${API_BASE}/tandatangan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          surat_id: currentSuratId,
+          username: user,
+          passphrase
+        })
+      });
+      const result = await res.json(); // { success, message? }
+      if (result?.success) {
+        alert('Surat berhasil ditandatangani.');
+        location.reload();
+      } else {
+        alert('Gagal tanda tangan: ' + (result?.message || ''));
+      }
+    } catch (err) {
+      console.error('Tandatangan error:', err);
+      alert('Terjadi kesalahan saat proses tanda tangan.');
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.classList.contains('btn-tandatangan')) {
+      const row = e.target.closest('tr');
+      const suratId = row?.getAttribute('data-surat-id');
+      if (!suratId) return alert('ID surat tidak ditemukan.');
+      currentSuratId = suratId;
+      document.getElementById('passphraseInput').value = '';
+      document.getElementById('passphraseModal').style.display = 'block';
+    }
+  });
+
+  function goHome() {
+    window.location.href = 'dashboard.html';
+  }
+
+  (async () => {
+    await getUserInfo();
+    loadSuratMasuk();
+  })();
+</script>
+
+  <script src="navbar.js"></script>
+
+
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Detail Surat</title>
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+    }
+    h2 {
+      text-align: center;
+      margin-top: 2rem;
+      color: #007bff;
+    }
+    #detail-container {
+      background: #ffffff;
+      padding: 2rem;
+      margin: 2rem auto;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+      max-width: 800px;
+    }
+    .actions {
+      display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+    }
+    .text-sm { font-size: .9rem; color: #555; }
+    .input {
+      padding: .5rem .75rem; border: 1px solid #ddd; border-radius: 8px;
+    }
+    button {
+      background: #237bff; color: #fff; border: 0; border-radius: 8px;
+      padding: .6rem 1rem; cursor: pointer;
+    }
+    button.secondary { background: #6c757d; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* Modal umum */
+    .modal { display: none; position: fixed; z-index: 999; inset: 0; background-color: rgba(0,0,0,0.7); }
+    .modal-content {
+      background-color: #fff; margin: 5% auto; padding: 16px; border-radius: 12px; width: 90%; max-width: 900px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: .5rem;
+    }
+    .close { font-size: 24px; font-weight: bold; cursor: pointer; }
+    iframe { width: 100%; height: 600px; border: none; }
+
+    /* Badge status */
+    .badge { display: inline-block; padding: .35rem .6rem; border-radius: 999px; font-weight: 600; }
+    .badge-valid { background: #e6f7ed; color: #178a4a; border: 1px solid #bfead0; }
+    .badge-invalid { background: #fde8e8; color: #b42318; border: 1px solid #f5c2c0; }
+    .kvs { display: grid; grid-template-columns: 200px 1fr; gap: .4rem 1rem; margin-top: .75rem; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace; word-break: break-all; }
+    .muted { color: #666; }
+    .divider { height: 1px; background: #eee; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h2>Detail Surat Masuk</h2>
+  <div id="detail-container"></div>
+  <div style="text-align:center; margin-bottom: 1rem;">
+      <button class="back-btn" onclick="goHome()" style="background-color: #237bff; color: white;">Kembali</button>
+  </div>
+  
+  <!-- Modal Viewer -->
+  <div id="pdfModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong>Pratinjau Dokumen</strong>
+        <span class="close" onclick="closeModal()">&times;</span>
+      </div>
+      <iframe id="pdfFrame"></iframe>
+    </div>
+  </div>
+
+  <!-- Modal Verifikasi -->
+  <div id="verifyModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong>Hasil Verifikasi Tanda Tangan</strong>
+        <span class="close" onclick="closeVerifyModal()">&times;</span>
+      </div>
+      <div id="verifyBody" class="text-sm">
+        <!-- hasil verifikasi akan diisi via JS -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+  const API_BASE = '/web';
+  const username = localStorage.getItem('user');
+  if (!username) location.href = 'index.html';
+
+  let currentSuratId = null;
+
+  function formatDateTimeWIB(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return d.toLocaleString('id-ID', {
+      day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      timeZone: 'Asia/Jakarta'
+    }) + ' WIB';
+  }
+
+  function copyText(t) {
+    navigator.clipboard?.writeText(t).then(()=>{},()=>{});
+  }
+
+  async function fetchDetail() {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id'); // id surat (bukan id pengiriman)
+    if (!id) return;
+    currentSuratId = id;
+
+    try {
+      const res = await fetch(`${API_BASE}/detail-surat?id=${encodeURIComponent(id)}&user=${encodeURIComponent(username)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json(); // { success, data: { surat, riwayat } }
+      if (!payload?.success || !payload.data) throw new Error(payload?.message || 'Payload tidak sesuai');
+
+      const { surat, riwayat } = payload.data;
+
+      const tglBuat = surat?.tanggal_surat
+        ? new Date(surat.tanggal_surat).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '-';
+
+      const riwayatHTML = Array.isArray(riwayat) && riwayat.length
+        ? riwayat.map(r => `
+            <li style="margin-bottom:1rem;line-height:1.5;">
+              <div><strong>${
+                r.waktu_kirim
+                  ? new Date(r.waktu_kirim).toLocaleDateString(
+                      'id-ID',
+                      { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' }
+                    ) + ' WIB'
+                  : '-'
+              }</strong></div>
+              <div>📤 Dari: <strong>${r.pengirim || '-'}</strong> Ke: <strong>${r.penerima || '-'}</strong></div>
+              ${r.catatan ? `<div>📌 Catatan: <em>${r.catatan}</em></div>` : ''}
+            </li>
+          `).join('')
+        : '<li>Tidak ada riwayat.</li>';
+
+      const container = document.getElementById('detail-container');
+      container.innerHTML = `
+        <h3>Informasi Surat</h3>
+        <p><strong>Pembuat:</strong> ${surat?.pengirim || '-'}</p>
+        <p><strong>Judul:</strong> ${surat?.nama_dokumen || '-'}</p>
+        <p><strong>Tanggal Dibuat:</strong> ${tglBuat}</p>
+        <p><strong>Status:</strong> ${surat?.status || '-'}</p>
+
+        <div class="actions" style="margin: .75rem 0 1.25rem;">
+          <button onclick="openPdfViewer('${API_BASE}/decrypt/${surat?.id}')">📎 Lihat</button>
+          <button id="btnVerify" onclick="verifySurat()">🔍 Verifikasi Tanda Tangan</button>
+        </div>
+
+        <div class="divider"></div>
+        <h3>Riwayat Disposisi</h3>
+        <ol>${riwayatHTML}</ol>
+      `;
+    } catch (err) {
+      console.error('fetchDetail error:', err);
+      const container = document.getElementById('detail-container');
+      if (container) container.innerHTML = '<p style="color:#c00">Gagal memuat detail surat.</p>';
+    }
+  }
+
+  function openPdfViewer(url) {
+    document.getElementById('pdfFrame').src = url;
+    document.getElementById('pdfModal').style.display = 'block';
+  }
+  function closeModal() {
+    document.getElementById('pdfModal').style.display = 'none';
+    document.getElementById('pdfFrame').src = '';
+  }
+
+  function openVerifyModal() {
+    document.getElementById('verifyModal').style.display = 'block';
+  }
+  function closeVerifyModal() {
+    document.getElementById('verifyModal').style.display = 'none';
+    document.getElementById('verifyBody').innerHTML = '';
+  }
+
+  async function verifySurat() {
+    const btn = document.getElementById('btnVerify');
+    const expectedSigner = document.getElementById('expectedSigner')?.value?.trim();
+    if (!currentSuratId) return;
+
+    btn.disabled = true; btn.textContent = 'Memverifikasi…';
+
+    try {
+      const res = await fetch(`${API_BASE}/verifikasi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ surat_id: Number(currentSuratId) })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      const ok = !!data?.ok;
+      const statusBadge = ok
+        ? '<span class="badge badge-valid">VALID</span>'
+        : `<span class="badge badge-invalid">${data?.code || 'INVALID'}</span>`;
+
+      const signer = data?.signer ?? '-';
+      const alg = data?.algorithm ?? '-';
+      const signedAt = formatDateTimeWIB(data?.signed_at);
+      const docHash = data?.document?.sha256_signed_part ?? '-';
+      const bytesSigned = data?.document?.bytes_signed ?? '-';
+      const bytesTotal = data?.document?.bytes_total ?? '-';
+
+      const cert = data?.certificate || {};
+      const certLines = cert?.hasCert ? `
+        <div class="kvs">
+          <div>Subject</div><div class="mono">${cert.subject || '-'}</div>
+          <div>Berlaku</div><div>${cert.notBefore ? formatDateTimeWIB(cert.notBefore) : '-'} &mdash; ${cert.notAfter ? formatDateTimeWIB(cert.notAfter) : '-'}</div>
+          <div>Valid Saat Ini</div><div>${cert.validNow ? 'Ya' : 'Tidak'}</div>
+          ${typeof cert.chainOK === 'boolean' ? `<div>Rantai ke Root CA</div><div>${cert.chainOK ? 'OK' : 'Gagal'}</div>` : ''}
+        </div>
+      ` : '<div class="muted">Tidak ada sertifikat X.509 untuk penandatangan ini.</div>';
+
+      const body = `
+        <div style="margin:.25rem 0 .75rem">Status Verifikasi: ${statusBadge}</div>
+        <div class="kvs">
+          <div>Penandatangan</div><div class="mono">${signer}</div>
+          <div>Algoritma</div><div>${alg}</div>
+          <div>Waktu TTD</div><div>${signedAt}</div>
+          <div>SHA-256 (konten ditandatangani)</div>
+          <div>
+            <span class="mono">${docHash}</span>
+            ${docHash && docHash !== '-' ? `<button class="secondary" style="margin-left:.5rem" onclick="copyText('${docHash}')">Salin</button>` : ''}
+          </div>
+          <div>Ukuran Byte</div><div>${bytesSigned} / ${bytesTotal}</div>
+        </div>
+
+        <div class="divider"></div>
+        <h4>Informasi Sertifikat</h4>
+        ${certLines}
+
+        ${!ok ? `<div class="divider"></div><div><strong>Detail:</strong> ${data?.message || 'Tanda tangan tidak valid atau dokumen tidak memiliki kontainer tanda tangan.'}</div>` : ''}
+      `;
+
+      document.getElementById('verifyBody').innerHTML = body;
+      openVerifyModal();
+    } catch (e) {
+      document.getElementById('verifyBody').innerHTML =
+        '<p style="color:#b42318">Gagal memverifikasi dokumen. Coba lagi.</p>';
+      openVerifyModal();
+    } finally {
+      btn.disabled = false; btn.textContent = '🔍 Verifikasi Tanda Tangan';
+    }
+  }
+
+  function goHome() { window.location.href = 'data-surat-masuk.html'; }
+
+  // init
+  fetchDetail();
+  </script>
+
+</body>
+</html>

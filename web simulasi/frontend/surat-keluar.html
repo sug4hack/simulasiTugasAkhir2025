@@ -1,0 +1,232 @@
+<!-- <!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Form Surat Keluar</title>
+  <base href="/web/">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="navbar"></div>
+
+  <main class="content">
+    <section class="form-container">
+      <h2>📝 Form Surat Keluar</h2>
+      <form id="suratForm" enctype="multipart/form-data">
+        <input type="text" name="nomor_surat" placeholder="Nomor Surat" required />
+        <input type="number" name="tahun" placeholder="Tahun" required />
+        <input type="text" name="perihal" placeholder="Perihal" required />
+        <input type="date" name="tanggal_surat" required />
+
+        <select name="klasifikasi" required>
+          <option value="">-- Pilih Klasifikasi Surat --</option>
+          <option value="biasa">Biasa</option>
+          <option value="segera">Segera</option>
+          <option value="penting">Penting</option>
+          <option value="rahasia">Rahasia</option>
+        </select>
+
+        <input type="text" name="pengirim" placeholder="Nama Pengirim" required />
+        <input type="text" name="nama_dokumen" placeholder="Nama Dokumen" required />
+        <input type="file" name="file" required />
+
+        <button type="submit">📤 Simpan Surat</button>
+      </form>
+      <p id="info"></p>
+    </section>
+  </main>
+
+  <script src="navbar.js"></script>
+  <script>
+    const user = localStorage.getItem('loggedInUser');
+    if (user) {
+      document.querySelector('input[name="pengirim"]').value = user;
+    }
+
+    document.getElementById("suratForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+      const info = document.getElementById("info");
+      info.innerText = "Mengunggah dan mengenkripsi surat...";
+
+      try {
+        const response = await fetch("/web/upload-surat-keluar", {
+          method: "POST",
+          body: formData
+        });
+
+        const text = await response.text();
+        let result;
+        try {
+          result = JSON.parse(text);
+        } catch (err) {
+          console.error("RESPON BUKAN JSON:", text);
+          throw new Error("Server tidak mengembalikan JSON valid.");
+        }
+
+        if (result.success) {
+          info.style.color = "green";
+          info.innerText = "Surat berhasil disimpan dan dienkripsi.";
+          this.reset();
+        } else {
+          info.style.color = "red";
+          info.innerText = result.message || "Gagal menyimpan surat";
+        }
+      } catch (err) {
+        console.error("Gagal:", err);
+        info.style.color = "red";
+        info.innerText = "Terjadi kesalahan saat mengunggah surat";
+      }
+    });
+  </script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Form Surat Keluar</title>
+  <base href="/web/">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="navbar"></div>
+
+  <main class="content">
+  <section class="form-container">
+    <h2>📝 Form Surat Keluar</h2>
+
+    <form id="suratForm" enctype="multipart/form-data">
+      <input type="text" name="nomor_surat" placeholder="Nomor Surat" required />
+      <input type="number" name="tahun" placeholder="Tahun" required />
+      <input type="text" name="perihal" placeholder="Perihal" required />
+      <input type="date" name="tanggal_surat" required />
+
+      <select name="klasifikasi" required>
+        <option value="">-- Pilih Klasifikasi Surat --</option>
+        <option value="biasa">Biasa</option>
+        <option value="segera">Segera</option>
+        <option value="penting">Penting</option>
+        <option value="rahasia">Rahasia</option>
+      </select>
+
+      <!-- Pengirim (auto dari localStorage) -->
+      <input type="text" name="pengirim" placeholder="Nama Pengirim" readonly required />
+
+      <!-- Penandatangan (dinamis dari /api/penandatangan) -->
+      <select name="penandatangan" required>
+        <option value="">Memuat penandatangan...</option>
+      </select>
+
+      <input type="text" name="nama_dokumen" placeholder="Nama Dokumen" required />
+      <input type="file" name="file" accept=".pdf" required />
+
+      <button type="submit">📤 Simpan Surat</button>
+    </form>
+
+    <p id="info"></p>
+  </section>
+</main>
+
+<script>
+  const API_BASE = '/web';
+
+  const formEl = document.getElementById('suratForm');
+  const infoEl = document.getElementById('info');
+  const pengirimInput = formEl.querySelector('input[name="pengirim"]');
+  const penandatanganSelect = formEl.querySelector('select[name="penandatangan"]');
+
+  const user = localStorage.getItem('user');
+  if (!user) {
+    location.href = 'index.html';
+  } else {
+    pengirimInput.value = user;
+    loadPenandatangan(user);
+  }
+
+  async function loadPenandatangan(pengirim) {
+    try {
+      const res = await fetch(`${API_BASE}/penandatangan?username=${encodeURIComponent(pengirim)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json(); // { success, data:[{username, jabatan}] }
+
+      if (!payload?.success || !Array.isArray(payload.data)) {
+        throw new Error(payload?.message || 'Payload tidak sesuai');
+      }
+
+      // Render opsi
+      penandatanganSelect.innerHTML = '';
+      if (payload.data.length === 0) {
+        penandatanganSelect.innerHTML = '<option disabled selected>Tidak ada penandatangan tersedia</option>';
+        return;
+      }
+
+      penandatanganSelect.insertAdjacentHTML('beforeend', '<option value="">-- Pilih Penandatangan --</option>');
+      payload.data.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.username;
+        opt.textContent = `${u.username} ${u.jabatan ? `(${u.jabatan})` : ''}`;
+        penandatanganSelect.appendChild(opt);
+      });
+    } catch (err) {
+      console.error('Gagal memuat penandatangan:', err);
+      penandatanganSelect.innerHTML = '<option disabled selected>Gagal memuat penandatangan</option>';
+    }
+  }
+
+  formEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    infoEl.style.color = '';
+    infoEl.textContent = 'Mengunggah dan mengenkripsi surat...';
+
+    // Validasi ekstra: pastikan penandatangan terpilih & file ada
+    if (!penandatanganSelect.value) {
+      infoEl.style.color = 'red';
+      infoEl.textContent = 'Silakan pilih penandatangan.';
+      return;
+    }
+    const fileInput = formEl.querySelector('input[name="file"]');
+    if (!fileInput.files.length) {
+      infoEl.style.color = 'red';
+      infoEl.textContent = 'Silakan unggah berkas PDF.';
+      return;
+    }
+
+    try {
+      const formData = new FormData(formEl);
+
+      // Upload endpoint TANPA /api
+      const res = await fetch(`${API_BASE}/upload-surat-keluar`, {
+        method: 'POST',
+        body: formData
+      });
+      const payload = await res.json(); // { success, message? }
+
+      if (payload?.success) {
+        infoEl.style.color = 'green';
+        infoEl.textContent = 'Surat berhasil disimpan dan dienkripsi.';
+        formEl.reset();
+        // set ulang pengirim setelah reset
+        pengirimInput.value = user;
+      } else {
+        infoEl.style.color = 'red';
+        infoEl.textContent = payload?.message || 'Gagal menyimpan surat.';
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      infoEl.style.color = 'red';
+      infoEl.textContent = 'Terjadi kesalahan saat mengunggah surat.';
+    }
+  });
+</script>
+
+
+  <script src="navbar.js"></script>
+
+
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "name": "web-login",
+  "version": "1.0.0",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "base-64": "^1.0.0",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2",
+    "express-rate-limit": "^6.11.2",
+    "form-data": "^4.0.4",
+    "fs": "^0.0.1-security",
+    "multer": "^2.0.2",
+    "mysql2": "^3.14.2",
+    "node-cron": "^2.0.3",
+    "path": "^0.12.7",
+    "pdf-lib": "^1.17.1",
+    "readline-sync": "^1.4.10"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
