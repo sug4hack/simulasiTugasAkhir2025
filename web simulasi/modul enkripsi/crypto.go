@@ -150,7 +150,7 @@ func encryption(plaintext []byte, key []byte, aad []byte) ([]byte, error) {
 	}
 
 	// Buat AES cipher
-	block, err := aes.NewCipher(key)
+	block, err := xxx.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
@@ -181,7 +181,7 @@ func decryption(encryptedData []byte, key []byte, aad []byte) ([]byte, error) {
 	}
 
 	// Buat AES cipher
-	block, err := aes.NewCipher(key)
+	block, err := xxx.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
